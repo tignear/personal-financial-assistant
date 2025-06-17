@@ -47,7 +47,6 @@ object HelloWorld extends ZIOAppDefault:
       .in("pet" / path[Int]("petId"))
       .errorOut(stringBody)
       .out(jsonBody[Pet])
-  // Same as above, but combining endpoint description with server logic:
   val petServerEndpoint: ZServerEndpoint[Any, Any] = petEndpoint.zServerLogic {
     petId =>
       if (petId == 35) {
@@ -60,11 +59,29 @@ object HelloWorld extends ZIOAppDefault:
   }
   val petServerRoutes: HttpRoutes[RIO[PetService, _]] =
     ZHttp4sServerInterpreter().from(petServerEndpoint).toRoutes
+  val rootEndpoint: Endpoint[Unit, Unit, String, String, Any] =
+    endpoint.get
+      .in("")
+      .errorOut(stringBody)
+      .out(stringBody)
 
+  val rootServerEndpoint: ZServerEndpoint[Any, Any] =
+    rootEndpoint.zServerLogic { _ =>
+      ZIO.succeed("Hello World!")
+    }
+  val serverRoutes: HttpRoutes[RIO[PetService, _]] =
+    ZHttp4sServerInterpreter()
+      .from(
+        List(
+          petServerEndpoint.widen[PetService],
+          rootServerEndpoint.widen[PetService]
+        )
+      )
+      .toRoutes
   val serve: ZIO[PetService, Throwable, Unit] =
     EmberServerBuilder
       .default[RIO[PetService, _]]
-      .withHttpApp(Router("/" -> petServerRoutes).orNotFound)
+      .withHttpApp(Router("/" -> serverRoutes).orNotFound)
       .build
       .useForever
 

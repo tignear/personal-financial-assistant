@@ -4,10 +4,10 @@ ThisBuild / scalaVersion := "3.7.1"
 ThisBuild / scalacOptions ++= Seq("-Xkind-projector:underscores")
 
 enablePlugins(GraalVMNativeImagePlugin)
+
 lazy val root = (project in file("."))
   .settings(
     Compile / mainClass := Some("com.tignear.HelloWorld"),
-    containerBuildImage := Some("ghcr.io/graalvm/native-image-community:24.0.1"),
     graalVMNativeImageOptions ++= Seq(
       "--no-fallback",
       "--install-exit-handlers",
@@ -30,7 +30,7 @@ lazy val app = (project in file("app"))
 val http4sVersion = "0.23.30"
 lazy val dependencies =
   new {
-    val http4s_ember = "org.http4s" %% "http4s-ember-server" % "0.23.30";
+    val http4s_ember = "org.http4s" %% "http4s-ember-server" % http4sVersion;
     val zio_interop_cats = "dev.zio" %% "zio-interop-cats" % "23.1.0.5";
     val tapir_http4s_server_zio =
       "com.softwaremill.sttp.tapir" %% "tapir-http4s-server-zio" % "1.11.34"
