@@ -1,21 +1,19 @@
-# Dev Containerで開発を始める
+# Personal Financial Assistant(仮)
 
----
+## Dev Containerで開発を始める
 
-## 事前準備 (必須インストール)
+### 事前準備 (必須インストール)
 
 * **Git**
 * **Docker Desktop**
 * **VS Code**
 * **VS Code 拡張機能: Dev Containers**
 
----
-
-## 開発環境セットアップ手順
+### 開発環境セットアップ手順
 
 1.  **リポジトリをクローン**
 
-```bash
+    ```bash
     git clone https://github.com/tignear/personal-financial-assistant.git
     cd personal-financial-assistant
     ```
@@ -31,11 +29,9 @@
     * 初回のみ数分かかる場合があります。
     * VS Code左下の表示が「**Dev Container: Scala**」になれば完了です。
 
----
+### 開発開始
 
-## 開発開始
-
-### インストール済みツールと機能
+#### インストール済みツールと機能
 
 * **Scala/Java開発環境**:
     * Java 24 (GraalVM/Temurin) および **SBT (Scala Build Tool)** がインストールされています。
@@ -50,9 +46,7 @@
 * **Docker操作**:
     * コンテナ内でDockerコマンドを使えます。
 
----
-
-## トラブルシューティング
+### トラブルシューティング
 
 * **Docker Desktopが起動している**ことを確認してください。
 * **VS CodeのDev Containers拡張機能がインストールされている**ことを確認してください。
