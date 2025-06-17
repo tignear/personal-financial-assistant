@@ -1,0 +1,36 @@
+{
+  "name": "Scala",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "latest"
+    }
+  },
+  "forwardPorts": [
+    8080
+  ],
+  "postCreateCommand": "echo 'source /usr/local/sdkman/bin/sdkman-init.sh' >> /home/vscode/.bashrc && /bin/bash -c 'source /usr/local/sdkman/bin/sdkman-init.sh && sbt compile'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "scalameta.metals",
+        "vscjava.vscode-java-pack"
+      ],
+      "settings": {
+        "java.debug.settings.forceBuildBeforeLaunch": true,
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-24",
+            "path": "/usr/local/sdkman/candidates/java/current",
+            "default": true
+          }
+        ]
+      }
+    },
+    "remoteEnv": {
+      "JAVA_OPTS": "-Xmx4G -Xms1G"
+    }
+  }
+}
