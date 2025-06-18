@@ -31,6 +31,22 @@
 
 ### 開発開始
 
+#### DBの起動とマイグレーション
+
+1. DB(PostgreSQL)の起動
+
+    ```bash
+    docker compose up -d
+    # DB: localhost:55432, ユーザー: pfa_user, パスワード: pfa_pass, DB名: pfa_db
+    ```
+
+2. DBマイグレーション（テーブル作成）
+
+    ```bash
+    sbt flywayMigrate
+    # eventテーブルが作成される
+    ```
+
 #### インストール済みツールと機能
 
 * **Scala/Java開発環境**:

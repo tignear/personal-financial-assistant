@@ -1,18 +1,19 @@
 package com.tignear.pfa.feature.transaction
 
-/**
-  * TimelineSpec tests the business rules for Timeline aggregation:
+/** TimelineSpec tests the business rules for Timeline aggregation:
   *
-  * - Only events for the specified user are included.
-  * - Only TransactionExpenseEvent is summed for expenses.
-  * - The time range is [from, to): from is inclusive, to is exclusive.
-  * - beforeAmount is the sum of all expenses strictly before 'from'.
-  * - totalExpense is the sum of all expenses in [from, to).
-  * - Events at 'from' are included, at 'to' are excluded.
-  * - Empty, all-before, all-after, and reversed range cases are handled.
-  * - Reversed range (from > to) results in a domain error (TimelineQueryError.InvalidRange).
+  *   - Only events for the specified user are included.
+  *   - Only TransactionExpenseEvent is summed for expenses.
+  *   - The time range is [from, to): from is inclusive, to is exclusive.
+  *   - beforeAmount is the sum of all expenses strictly before 'from'.
+  *   - totalExpense is the sum of all expenses in [from, to).
+  *   - Events at 'from' are included, at 'to' are excluded.
+  *   - Empty, all-before, all-after, and reversed range cases are handled.
+  *   - Reversed range (from > to) results in a domain error
+  *     (TimelineQueryError.InvalidRange).
   *
-  * These tests ensure correctness, boundary handling, and user isolation for the Timeline feature.
+  * These tests ensure correctness, boundary handling, and user isolation for
+  * the Timeline feature.
   */
 
 import zio.test._
@@ -53,24 +54,36 @@ object TimelineSpec extends ZIOSpecDefault {
   }.sum
 
   // Helper to create a TransactionExpenseEvent for this user
-  def exp(amount: Long, at: Instant, uid: UserId = userId): TransactionExpenseEvent =
+  def exp(
+      amount: Long,
+      at: Instant,
+      uid: UserId = userId
+  ): TransactionExpenseEvent =
     TransactionExpenseEvent(uid, amount, at)
 
   // Helper to check if all events are within [from, to)
-  def allInRange(events: List[TransactionEvent], from: Instant, to: Instant): Boolean =
-    events.forall(e => !e.transactionDate.isBefore(from) && e.transactionDate.isBefore(to))
+  def allInRange(
+      events: List[TransactionEvent],
+      from: Instant,
+      to: Instant
+  ): Boolean =
+    events.forall(e =>
+      !e.transactionDate.isBefore(from) && e.transactionDate.isBefore(to)
+    )
 
   override def spec = suite("TimelineSpec")(
     // Test: Normal case with before, at, and in-range events
-    test("getTimeline: calculates beforeAmount and totalExpense correctly for normal case") {
+    test(
+      "getTimeline: calculates beforeAmount and totalExpense correctly for normal case"
+    ) {
       // This test checks that beforeAmount and totalExpense are correct for typical event distribution.
       val from = base
       val to = base.plusSeconds(7201)
       val testEvents = List(
         exp(100, base.minusSeconds(3600)), // before
-        exp(200, base.plusSeconds(3600)),  // in range
-        exp(300, base.plusSeconds(7200)),  // in range
-        exp(111, base)                     // exactly at 'from'
+        exp(200, base.plusSeconds(3600)), // in range
+        exp(300, base.plusSeconds(7200)), // in range
+        exp(111, base) // exactly at 'from'
       )
       val reader = new DummyReader(testEvents)
       val timeline = new Timeline(reader)
@@ -80,7 +93,9 @@ object TimelineSpec extends ZIOSpecDefault {
       } yield {
         val (summary, filteredEvents) = result
         val expectedBefore = testEvents.filter(_.transactionDate.isBefore(from))
-        val expectedInRange = testEvents.filter(e => !e.transactionDate.isBefore(from) && e.transactionDate.isBefore(to))
+        val expectedInRange = testEvents.filter(e =>
+          !e.transactionDate.isBefore(from) && e.transactionDate.isBefore(to)
+        )
         assert(summary.beforeAmount)(equalTo(sumAmounts(expectedBefore))) &&
         assert(summary.totalExpense)(equalTo(sumAmounts(expectedInRange))) &&
         assert(filteredEvents)(equalTo(expectedInRange)) &&
@@ -108,14 +123,22 @@ object TimelineSpec extends ZIOSpecDefault {
         result <- timeline.getTimeline(userId, from, to)
       } yield {
         val (summary, filteredEvents) = result
-        assert(filteredEvents.exists(e => e.amount == 111 && e.transactionDate == from))(isTrue) &&
-        assert(filteredEvents.exists(e => e.amount == 222 && e.transactionDate == to))(isFalse) &&
+        assert(
+          filteredEvents.exists(e =>
+            e.amount == 111 && e.transactionDate == from
+          )
+        )(isTrue) &&
+        assert(
+          filteredEvents.exists(e => e.amount == 222 && e.transactionDate == to)
+        )(isFalse) &&
         assert(allInRange(filteredEvents, from, to))(isTrue) &&
         assert(summary.totalExpense)(equalTo(200 + 300 + 111))
       }
     },
     // Test: All events after 'to'
-    test("getTimeline: all events after 'to' yields zero summary and empty events") {
+    test(
+      "getTimeline: all events after 'to' yields zero summary and empty events"
+    ) {
       // This test checks that if all events are after 'to', both beforeAmount and totalExpense are zero.
       val from = base
       val to = base.plusSeconds(7201)
@@ -135,7 +158,9 @@ object TimelineSpec extends ZIOSpecDefault {
       }
     },
     // Test: All events before 'from'
-    test("getTimeline: all events before 'from' yields beforeAmount > 0 and totalExpense == 0") {
+    test(
+      "getTimeline: all events before 'from' yields beforeAmount > 0 and totalExpense == 0"
+    ) {
       // This test checks that if all events are before 'from', beforeAmount is sum of all, totalExpense is zero.
       val from = base
       val to = base.plusSeconds(7201)
@@ -155,7 +180,9 @@ object TimelineSpec extends ZIOSpecDefault {
       }
     },
     // Test: Empty event list
-    test("getTimeline: empty event list returns zero summary and empty events") {
+    test(
+      "getTimeline: empty event list returns zero summary and empty events"
+    ) {
       // This test checks that an empty event list returns zero for all summary fields.
       val reader = new DummyReader(Nil)
       val timeline = new Timeline(reader)
@@ -177,9 +204,9 @@ object TimelineSpec extends ZIOSpecDefault {
       val to = base.plusSeconds(7201)
       val testEvents = List(
         exp(100, base.minusSeconds(3600)), // userId 1, before
-        exp(200, base.plusSeconds(3600)),  // userId 1, in range
+        exp(200, base.plusSeconds(3600)), // userId 1, in range
         exp(999, base.plusSeconds(3600), otherUserId), // userId 2, in range
-        exp(300, base.plusSeconds(7200))   // userId 1, in range
+        exp(300, base.plusSeconds(7200)) // userId 1, in range
       )
       val reader = new DummyReader(testEvents)
       val timeline = new Timeline(reader)
@@ -192,7 +219,9 @@ object TimelineSpec extends ZIOSpecDefault {
       }
     },
     // Test: Reversed range should return TimelineQueryError.InvalidRange
-    test("getTimeline: reversed range (from > to) returns TimelineQueryError.InvalidRange") {
+    test(
+      "getTimeline: reversed range (from > to) returns TimelineQueryError.InvalidRange"
+    ) {
       // This test checks that a reversed range returns a domain error, not a fatal error.
       val from = base.plusSeconds(7201)
       val to = base
@@ -209,7 +238,7 @@ object TimelineSpec extends ZIOSpecDefault {
       effect.map {
         case Left(TimelineQueryError.InvalidRange) => assertCompletes
         case Left(other) => assert(false)(isTrue) // Unexpected error
-        case Right(_) => assert(false)(isTrue) // Should not succeed
+        case Right(_)    => assert(false)(isTrue) // Should not succeed
       }
     }
   )

@@ -1,17 +1,22 @@
 package com.tignear.pfa.feature.transaction
 
-/**
-  * TransactionSpec tests the business rules for transaction command and usecase handling:
+/** TransactionSpec tests the business rules for transaction command and usecase
+  * handling:
   *
-  * - Only positive amounts are accepted for expense commands; non-positive amounts yield InvalidAmountError.
-  * - TransactionAggregate.handleCommand returns the correct event or error for each command.
-  * - TransactionUsecase.expense persists events using the event store, or returns errors as appropriate.
-  * - No event is saved if the command is invalid.
-  * - InfraStructureError is propagated if event saving fails.
-  * - Multiple events for the same or different users are saved and ordered correctly.
-  * - All event persistence is isolated per user.
+  *   - Only positive amounts are accepted for expense commands; non-positive
+  *     amounts yield InvalidAmountError.
+  *   - TransactionAggregate.handleCommand returns the correct event or error
+  *     for each command.
+  *   - TransactionUsecase.expense persists events using the event store, or
+  *     returns errors as appropriate.
+  *   - No event is saved if the command is invalid.
+  *   - InfraStructureError is propagated if event saving fails.
+  *   - Multiple events for the same or different users are saved and ordered
+  *     correctly.
+  *   - All event persistence is isolated per user.
   *
-  * These tests ensure correctness, error handling, and persistence logic for the transaction feature.
+  * These tests ensure correctness, error handling, and persistence logic for
+  * the transaction feature.
   */
 
 import zio.test._

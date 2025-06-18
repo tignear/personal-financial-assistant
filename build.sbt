@@ -4,7 +4,12 @@ ThisBuild / scalaVersion := "3.7.1"
 ThisBuild / scalacOptions ++= Seq("-Xkind-projector:underscores")
 
 enablePlugins(GraalVMNativeImagePlugin)
+enablePlugins(FlywayPlugin)
 
+flywayUrl := "jdbc:postgresql://localhost:55432/pfa_db";
+flywayUser := "pfa_user";
+flywayPassword := "pfa_pass";
+flywayLocations := Seq("filesystem:app/src/main/resources/db/migration");
 lazy val root = (project in file("."))
   .settings(
     name := "root",
@@ -28,7 +33,7 @@ lazy val app = (project in file("app"))
       dependencies.tapir_json_circe,
       dependencies.zio,
       dependencies.zio_test,
-      dependencies.zio_test_sbt
+      dependencies.zio_test_sbt,
     )
   )
 val http4sVersion = "0.23.30"
