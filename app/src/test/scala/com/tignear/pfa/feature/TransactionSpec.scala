@@ -7,16 +7,14 @@ import java.util.UUID
 import zio._
 import zio.stm._
 import com.tignear.pfa.core.Types._
-import com.tignear.pfa.feature.TransactionEvent
-import com.tignear.pfa.feature.TransactionEvent._
-import com.tignear.pfa.feature.TransactionCommand
-import com.tignear.pfa.feature.TransactionAggregate
-import com.tignear.pfa.feature.TransactionCommandError
-import com.tignear.pfa.feature.TransactionEventStore
+import com.tignear.pfa.feature.transaction._
 import com.tignear.pfa.core.InfraStructureError
-import com.tignear.pfa.feature.TransactionUsecase
 
 object TransactionSpec extends ZIOSpecDefault {
+  case class StoredTransactionEvent(
+      event: TransactionEvent,
+      version: Long
+  )
 
   /** An in-memory implementation of TransactionEventStore for testing purposes.
     * It stores events in a TRef, making it safe for concurrent access within
@@ -28,7 +26,8 @@ object TransactionSpec extends ZIOSpecDefault {
     *   A TRef to control whether the save operation should fail.
     */
   class InMemoryTransactionEventStore(
-      eventsRef: TRef[List[TransactionEvent]],
+      eventsRef: TRef[Map[UserId, List[StoredTransactionEvent]]],
+      versionsRef: TRef[Map[UserId, Long]],
       shouldFailSaveRef: TRef[Boolean]
   ) extends TransactionEventStore {
 
@@ -52,27 +51,51 @@ object TransactionSpec extends ZIOSpecDefault {
               )
             )
           } else {
-            eventsRef.update(event :: _)
+            for {
+              currentVersion <- versionsRef.get.map(
+                _.getOrElse(event.userId, 0L)
+              )
+              newVersion = currentVersion + 1
+              storedEvent = StoredTransactionEvent(event, newVersion)
+
+              _ <- eventsRef.update(m =>
+                m.updated(
+                  event.userId,
+                  storedEvent :: m.getOrElse(event.userId, List.empty)
+                )
+              )
+              _ <- versionsRef.update(m => m.updated(event.userId, newVersion))
+            } yield ()
           }
         }
       }.unit
 
-    /** Sets the flag to determine if the next save operation should fail.
-      * @param fail
-      *   True to make save fail, false otherwise.
-      * @return
-      *   A ZIO effect that completes when the flag is set.
-      */
-    def setShouldFailSave(fail: Boolean): UIO[Unit] =
+      /** Sets the flag to determine if the next save operation should fail.
+        * @param fail
+        *   True to make save fail, false otherwise.
+        * @return
+        *   A ZIO effect that completes when the flag is set.
+        */
+    def setShouldFailSave(fail: Boolean): ZIO[Any, Nothing, Unit] =
       STM.atomically(shouldFailSaveRef.set(fail))
 
-    /** Retrieves all events currently stored in the in-memory store.
-      * @return
-      *   A ZIO effect that returns a list of all TransactionEvent.
-      */
-    def getEvents(): ZIO[Any, Nothing, List[TransactionEvent]] =
+    def getStoredEventsForUser(
+        userId: UserId
+    ): ZIO[Any, Nothing, List[StoredTransactionEvent]] =
       STM.atomically {
-        eventsRef.get.map(_.reverse) // Reverse to get chronological order
+        eventsRef.get.map(_.getOrElse(userId, List.empty).sortBy(_.version))
+      }
+
+    def getEventsForUser(
+        userId: UserId
+    ): ZIO[Any, Nothing, List[TransactionEvent]] =
+      getStoredEventsForUser(userId).map(_.map(_.event))
+
+    def getAllStoredEvents(): ZIO[Any, Nothing, List[StoredTransactionEvent]] =
+      STM.atomically {
+        eventsRef.get.map(
+          _.values.flatten.toList.sortBy(e => (e.event.userId.id, e.version))
+        )
       }
   }
 
@@ -88,9 +111,10 @@ object TransactionSpec extends ZIOSpecDefault {
       ZLayer.fromZIO(
         STM.atomically {
           for {
-            events <- TRef.make(List.empty[TransactionEvent])
+            events <- TRef.make(Map.empty[UserId, List[StoredTransactionEvent]])
+            versions <- TRef.make(Map.empty[UserId, Long])
             failFlag <- TRef.make(false) // Initial state is not to fail
-          } yield new InMemoryTransactionEventStore(events, failFlag)
+          } yield new InMemoryTransactionEventStore(events, versions, failFlag)
         }
       )
   }
@@ -104,7 +128,7 @@ object TransactionSpec extends ZIOSpecDefault {
       val userId = UserId(1673)
       val transactionDate = Instant.now()
 
-      val command = TransactionCommand.Expence(
+      val command = TransactionExpenceCommand(
         amount = 1500L,
         transactionDate = transactionDate,
         userId = userId
@@ -115,28 +139,28 @@ object TransactionSpec extends ZIOSpecDefault {
       assert(result)(
         isRight(
           // Filter by type using isSubtype
-          isSubtype[TransactionExpenceRecord](
+          isSubtype[TransactionExpenceEvent](
             // In the isSubtype assertion block, directly access fields and
             // assert their results individually.
             hasField(
               "userId",
-              (e: TransactionExpenceRecord) => e.userId,
+              (e: TransactionExpenceEvent) => e.userId,
               equalTo(userId)
             ) &&
               hasField(
                 "amount",
-                (e: TransactionExpenceRecord) => e.amount,
+                (e: TransactionExpenceEvent) => e.amount,
                 equalTo(1500L)
               ) &&
               hasField(
                 "transactionDate",
-                (e: TransactionExpenceRecord) => e.transactionDate,
+                (e: TransactionExpenceEvent) => e.transactionDate,
                 equalTo(transactionDate)
               ) &&
               hasField(
                 "eventType",
-                (e: TransactionExpenceRecord) => e.eventType,
-                equalTo("TransactionEvent")
+                (e: TransactionExpenceEvent) => e.eventType,
+                equalTo("TransactionExpenceEvent")
               )
           )
         )
@@ -146,7 +170,7 @@ object TransactionSpec extends ZIOSpecDefault {
     test(
       "should return InvalidAmount error for non-positive amount in expence command"
     ) {
-      val command = TransactionCommand.Expence(
+      val command = TransactionExpenceCommand(
         amount = -100L,
         transactionDate = Instant.now(),
         userId = UserId(1673)
@@ -176,27 +200,31 @@ object TransactionSpec extends ZIOSpecDefault {
         _ <- usecase.expence(userId, amount, transactionDate)
 
         // Retrieve saved events from the store
-        savedEvents <- store.getEvents()
+        savedEvents <- store.getAllStoredEvents()
       } yield assert(savedEvents)(
         hasSize(equalTo(1)) &&
           // Assert on the first (and only) saved event
           hasFirst(
-            isSubtype[TransactionExpenceRecord](
-              hasField(
-                "userId",
-                (e: TransactionExpenceRecord) => e.userId,
-                equalTo(userId)
-              ) &&
+            hasField(
+              "event",
+              (e: StoredTransactionEvent) => e.event,
+              isSubtype[TransactionExpenceEvent](
                 hasField(
-                  "amount",
-                  (e: TransactionExpenceRecord) => e.amount,
-                  equalTo(amount)
+                  "userId",
+                  (e: TransactionExpenceEvent) => e.userId,
+                  equalTo(userId)
                 ) &&
-                hasField(
-                  "transactionDate",
-                  (e: TransactionExpenceRecord) => e.transactionDate,
-                  equalTo(transactionDate)
-                )
+                  hasField(
+                    "amount",
+                    (e: TransactionExpenceEvent) => e.amount,
+                    equalTo(amount)
+                  ) &&
+                  hasField(
+                    "transactionDate",
+                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    equalTo(transactionDate)
+                  )
+              )
             )
           )
       )
@@ -235,7 +263,7 @@ object TransactionSpec extends ZIOSpecDefault {
         _ <- usecase.expence(userId, amount, transactionDate).ignore
 
         // Retrieve saved events from the store
-        savedEvents <- store.getEvents()
+        savedEvents <- store.getAllStoredEvents()
       } yield assert(savedEvents)(isEmpty) // Assert that no events were saved
     }.provide(
       InMemoryTransactionEventStore.createLayer(),
@@ -288,64 +316,76 @@ object TransactionSpec extends ZIOSpecDefault {
         _ <- usecase.expence(userId2, amount2, date2)
         _ <- usecase.expence(userId3, amount3, date3)
 
-        savedEvents <- store.getEvents()
+        savedEvents <- store.getAllStoredEvents()
       } yield assert(savedEvents)(
         hasSize(equalTo(3)) &&
           hasAt(0)(
-            isSubtype[TransactionExpenceRecord](
-              hasField(
-                "userId",
-                (e: TransactionExpenceRecord) => e.userId,
-                equalTo(userId1)
-              ) &&
+            hasField(
+              "event",
+              (e: StoredTransactionEvent) => e.event,
+              isSubtype[TransactionExpenceEvent](
                 hasField(
-                  "amount",
-                  (e: TransactionExpenceRecord) => e.amount,
-                  equalTo(amount1)
+                  "userId",
+                  (e: TransactionExpenceEvent) => e.userId,
+                  equalTo(userId1)
                 ) &&
-                hasField(
-                  "transactionDate",
-                  (e: TransactionExpenceRecord) => e.transactionDate,
-                  equalTo(date1)
-                )
+                  hasField(
+                    "amount",
+                    (e: TransactionExpenceEvent) => e.amount,
+                    equalTo(amount1)
+                  ) &&
+                  hasField(
+                    "transactionDate",
+                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    equalTo(date1)
+                  )
+              )
             )
           ) &&
           hasAt(1)(
-            isSubtype[TransactionExpenceRecord](
-              hasField(
-                "userId",
-                (e: TransactionExpenceRecord) => e.userId,
-                equalTo(userId2)
-              ) &&
+            hasField(
+              "event",
+              (e: StoredTransactionEvent) => e.event,
+              isSubtype[TransactionExpenceEvent](
                 hasField(
-                  "amount",
-                  (e: TransactionExpenceRecord) => e.amount,
-                  equalTo(amount2)
+                  "userId",
+                  (e: TransactionExpenceEvent) => e.userId,
+                  equalTo(userId2)
                 ) &&
-                hasField(
-                  "transactionDate",
-                  (e: TransactionExpenceRecord) => e.transactionDate,
-                  equalTo(date2)
-                )
+                  hasField(
+                    "amount",
+                    (e: TransactionExpenceEvent) => e.amount,
+                    equalTo(amount2)
+                  ) &&
+                  hasField(
+                    "transactionDate",
+                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    equalTo(date2)
+                  )
+              )
             )
           ) &&
           hasAt(2)(
-            isSubtype[TransactionExpenceRecord](
-              hasField(
-                "userId",
-                (e: TransactionExpenceRecord) => e.userId,
-                equalTo(userId3)
-              ) &&
+            hasField(
+              "event",
+              (e: StoredTransactionEvent) => e.event,
+              isSubtype[TransactionExpenceEvent](
                 hasField(
-                  "amount",
-                  (e: TransactionExpenceRecord) => e.amount,
-                  equalTo(amount3)
+                  "userId",
+                  (e: TransactionExpenceEvent) => e.userId,
+                  equalTo(userId3)
                 ) &&
-                hasField(
-                  "transactionDate",
-                  (e: TransactionExpenceRecord) => e.transactionDate,
-                  equalTo(date3)
-                )
+                  hasField(
+                    "amount",
+                    (e: TransactionExpenceEvent) => e.amount,
+                    equalTo(amount3)
+                  ) &&
+                  hasField(
+                    "transactionDate",
+                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    equalTo(date3)
+                  )
+              )
             )
           )
       )

@@ -7,6 +7,7 @@ enablePlugins(GraalVMNativeImagePlugin)
 
 lazy val root = (project in file("."))
   .settings(
+    name := "root",
     Compile / mainClass := Some("com.tignear.pfa.HelloWorld"),
     graalVMNativeImageOptions ++= Seq(
       "--no-fallback",
@@ -15,11 +16,11 @@ lazy val root = (project in file("."))
       "--enable-url-protocols=http,https"
     )
   )
-  .aggregate(app)
   .dependsOn(app)
 
 lazy val app = (project in file("app"))
   .settings(
+    name := "app",
     libraryDependencies ++= Seq(
       dependencies.http4s_ember,
       dependencies.zio_interop_cats,

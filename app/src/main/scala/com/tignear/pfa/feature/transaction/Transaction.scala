@@ -1,4 +1,4 @@
-package com.tignear.pfa.feature
+package com.tignear.pfa.feature.transaction
 
 import com.tignear.pfa.core.Types.UserId;
 import com.tignear.pfa.core.{Command, Event};
@@ -6,23 +6,20 @@ import java.time.Instant
 import com.tignear.pfa.core.InfraStructureError;
 import zio._
 
-sealed trait TransactionEvent extends Event:
-  override def eventType: String = "TransactionEvent"
-object TransactionEvent:
-  case class TransactionExpenceRecord(
-      userId: UserId,
-      amount: Long,
-      transactionDate: Instant
-  ) extends TransactionEvent
-
+sealed trait TransactionEvent extends Event
+case class TransactionExpenceEvent(
+    userId: UserId,
+    amount: Long,
+    transactionDate: Instant
+) extends TransactionEvent {
+  def eventType: String = "TransactionExpenceEvent"
+}
 sealed trait TransactionCommand extends Command
-object TransactionCommand:
-  case class Expence(
+case class TransactionExpenceCommand(
       userId: UserId,
       amount: Long,
       transactionDate: Instant
   ) extends TransactionCommand
-
 sealed trait TransactionCommandError
 object TransactionCommandError {
   case object InvalidAmountError extends TransactionCommandError
@@ -32,12 +29,12 @@ object TransactionAggregate:
   def handleCommand(
       command: TransactionCommand
   ): Either[TransactionCommandError, TransactionEvent] = command match {
-    case expenseCmd: TransactionCommand.Expence =>
+    case expenseCmd: TransactionExpenceCommand =>
       if (expenseCmd.amount < 0) {
         Left(TransactionCommandError.InvalidAmountError)
       } else {
         Right(
-          TransactionEvent.TransactionExpenceRecord(
+          TransactionExpenceEvent(
             amount = expenseCmd.amount,
             userId = expenseCmd.userId,
             transactionDate = expenseCmd.transactionDate
@@ -56,7 +53,7 @@ class TransactionUsecase(store: TransactionEventStore):
       amount: Long,
       transactionDate: Instant
   ): ZIO[Any, TransactionUsecaseError, Unit] = {
-    val command = TransactionCommand.Expence(
+    val command = TransactionExpenceCommand(
       amount = amount,
       transactionDate = transactionDate,
       userId = userId
