@@ -9,7 +9,5 @@ CREATE TABLE event (
     user_id BIGINT,
     CONSTRAINT event_stream_unique UNIQUE (stream_type, stream_id, version)
 );
-
-CREATE INDEX idx_event_stream ON event(stream_type, stream_id);
 CREATE INDEX idx_event_user_id ON event(user_id);
 CREATE INDEX idx_event_version ON event(version);

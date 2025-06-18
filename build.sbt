@@ -34,6 +34,7 @@ lazy val app = (project in file("app"))
       dependencies.zio,
       dependencies.zio_test,
       dependencies.zio_test_sbt,
+      dependencies.quill_jdbc_zio
     )
   )
 val http4sVersion = "0.23.30"
@@ -49,4 +50,5 @@ lazy val dependencies =
     val zio = "dev.zio" %% "zio" % zioVersion;
     val zio_test = "dev.zio" %% "zio-test" % zioVersion % Test;
     val zio_test_sbt = "dev.zio" %% "zio-test-sbt" % zioVersion % Test;
+    val quill_jdbc_zio = "io.getquill" %% "quill-jdbc-zio" % "4.7.3";
   }

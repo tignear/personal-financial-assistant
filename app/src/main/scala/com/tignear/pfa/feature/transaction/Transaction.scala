@@ -5,6 +5,11 @@ import com.tignear.pfa.core.{Command, Event};
 import java.time.Instant
 import com.tignear.pfa.core.InfraStructureError;
 import zio._
+import com.tignear.pfa.infrastructure.EventRow
+import io.getquill._
+import io.circe.syntax.EncoderOps
+import io.circe.generic.auto._
+import io.getquill.jdbczio.Quill
 
 sealed trait TransactionEvent extends Event {
   def transactionDate: Instant
@@ -49,6 +54,58 @@ object TransactionAggregate:
 
 trait TransactionEventStore:
   def save(event: TransactionEvent): ZIO[Any, InfraStructureError, Unit]
+
+class PostgresTransactionEventStore(
+    ctx: Quill.Postgres[SnakeCase]
+) extends TransactionEventStore {
+  import ctx._
+  import com.tignear.pfa.infrastructure.EventRow._ // for MappedEncoding
+
+  def save(
+      event: TransactionEvent
+  ): ZIO[Any, InfraStructureError, Unit] = {
+    val streamType = "transaction"
+    val streamId = event.userId.id.toString
+    val eventType = event.eventType
+    inline def selectMaxVersion = quote {
+      query[EventRow]
+        .filter(e =>
+          e.stream_type == lift(streamType) && e.stream_id == lift(streamId)
+        )
+        .map(_.version)
+        .max
+    }
+    def tryInsert: ZIO[Any, Throwable, Boolean] = for {
+      maxVersionOpt <- ctx.run(selectMaxVersion)
+      nextVersion = maxVersionOpt.getOrElse(0L) + 1L
+      payloadJson = event.asJson
+      row = EventRow(
+        stream_type = streamType,
+        stream_id = streamId,
+        event_type = eventType,
+        payload = payloadJson,
+        version = nextVersion,
+        user_id = Some(event.userId.id)
+      )
+      count <- run(
+        querySchema[EventRow]("event").insertValue(lift(row)).onConflictIgnore
+      )
+    } yield count > 0
+
+    tryInsert
+      .repeat(
+        Schedule.recurWhile((inserted: Boolean) => !inserted) && Schedule
+          .recurs(4)
+      )
+      .unit
+      .mapError(e => InfraStructureError.DatabaseError(e))
+  }
+}
+
+object PostgresTransactionEventStore {
+  val layer: ZLayer[Quill.Postgres[SnakeCase], Nothing, TransactionEventStore] =
+    ZLayer.fromFunction(new PostgresTransactionEventStore(_))
+}
 
 type TransactionUsecaseError = TransactionCommandError | InfraStructureError;
 class TransactionUsecase(store: TransactionEventStore):
