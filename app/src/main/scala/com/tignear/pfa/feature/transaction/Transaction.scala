@@ -6,11 +6,15 @@ import java.time.Instant
 import com.tignear.pfa.core.InfraStructureError;
 import zio._
 
-sealed trait TransactionEvent extends Event
+sealed trait TransactionEvent extends Event {
+  def transactionDate: Instant
+  def userId: UserId
+  def amount: Long
+}
 case class TransactionExpenseEvent(
-    userId: UserId,
-    amount: Long,
-    transactionDate: Instant
+    val userId: UserId,
+    val amount: Long,
+    val transactionDate: Instant
 ) extends TransactionEvent {
   def eventType: String = "TransactionExpenseEvent"
 }
@@ -65,3 +69,13 @@ class TransactionUsecase(store: TransactionEventStore):
 object TransactionUsecase:
   val layer: ZLayer[TransactionEventStore, Nothing, TransactionUsecase] =
     ZLayer.fromFunction(new TransactionUsecase(_))
+
+trait TransactionEventReader:
+  // Contains from,and not contains to
+  // If from is None, it means all events before 'to'
+  // If to is None, it means all events after 'from'
+  def read(
+      userId: UserId,
+      from: Option[Instant],
+      to: Option[Instant]
+  ): ZIO[Any, InfraStructureError, List[TransactionEvent]]

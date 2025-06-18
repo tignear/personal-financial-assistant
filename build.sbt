@@ -29,8 +29,7 @@ lazy val app = (project in file("app"))
       dependencies.zio,
       dependencies.zio_test,
       dependencies.zio_test_sbt
-    ),
-    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZioTestFramework"))
+    )
   )
 val http4sVersion = "0.23.30"
 val zioVersion = "2.1.19"
