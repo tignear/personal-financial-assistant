@@ -124,11 +124,11 @@ object TransactionSpec extends ZIOSpecDefault {
 
   // Suite for TransactionAggregate direct behavior
   val suite1 = suite("TransactionAggregate behavior")(
-    test("should record a new expence when RecordExpenceCommand is valid") {
+    test("should record a new expense when RecordExpenseCommand is valid") {
       val userId = UserId(1673)
       val transactionDate = Instant.now()
 
-      val command = TransactionExpenceCommand(
+      val command = TransactionExpenseCommand(
         amount = 1500L,
         transactionDate = transactionDate,
         userId = userId
@@ -139,28 +139,28 @@ object TransactionSpec extends ZIOSpecDefault {
       assert(result)(
         isRight(
           // Filter by type using isSubtype
-          isSubtype[TransactionExpenceEvent](
+          isSubtype[TransactionExpenseEvent](
             // In the isSubtype assertion block, directly access fields and
             // assert their results individually.
             hasField(
               "userId",
-              (e: TransactionExpenceEvent) => e.userId,
+              (e: TransactionExpenseEvent) => e.userId,
               equalTo(userId)
             ) &&
               hasField(
                 "amount",
-                (e: TransactionExpenceEvent) => e.amount,
+                (e: TransactionExpenseEvent) => e.amount,
                 equalTo(1500L)
               ) &&
               hasField(
                 "transactionDate",
-                (e: TransactionExpenceEvent) => e.transactionDate,
+                (e: TransactionExpenseEvent) => e.transactionDate,
                 equalTo(transactionDate)
               ) &&
               hasField(
                 "eventType",
-                (e: TransactionExpenceEvent) => e.eventType,
-                equalTo("TransactionExpenceEvent")
+                (e: TransactionExpenseEvent) => e.eventType,
+                equalTo("TransactionExpenseEvent")
               )
           )
         )
@@ -168,9 +168,9 @@ object TransactionSpec extends ZIOSpecDefault {
 
     },
     test(
-      "should return InvalidAmount error for non-positive amount in expence command"
+      "should return InvalidAmount error for non-positive amount in expense command"
     ) {
-      val command = TransactionExpenceCommand(
+      val command = TransactionExpenseCommand(
         amount = -100L,
         transactionDate = Instant.now(),
         userId = UserId(1673)
@@ -197,7 +197,7 @@ object TransactionSpec extends ZIOSpecDefault {
         ] // Access concrete store for getEvents()
 
         // Execute the expense usecase
-        _ <- usecase.expence(userId, amount, transactionDate)
+        _ <- usecase.expense(userId, amount, transactionDate)
 
         // Retrieve saved events from the store
         savedEvents <- store.getAllStoredEvents()
@@ -208,20 +208,20 @@ object TransactionSpec extends ZIOSpecDefault {
             hasField(
               "event",
               (e: StoredTransactionEvent) => e.event,
-              isSubtype[TransactionExpenceEvent](
+              isSubtype[TransactionExpenseEvent](
                 hasField(
                   "userId",
-                  (e: TransactionExpenceEvent) => e.userId,
+                  (e: TransactionExpenseEvent) => e.userId,
                   equalTo(userId)
                 ) &&
                   hasField(
                     "amount",
-                    (e: TransactionExpenceEvent) => e.amount,
+                    (e: TransactionExpenseEvent) => e.amount,
                     equalTo(amount)
                   ) &&
                   hasField(
                     "transactionDate",
-                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    (e: TransactionExpenseEvent) => e.transactionDate,
                     equalTo(transactionDate)
                   )
               )
@@ -243,7 +243,7 @@ object TransactionSpec extends ZIOSpecDefault {
       for {
         usecase <- ZIO.service[TransactionUsecase]
         // Attempt to execute the expense usecase with an invalid amount
-        actualError <- usecase.expence(userId, amount, transactionDate).flip
+        actualError <- usecase.expense(userId, amount, transactionDate).flip
       } yield assert(actualError)(
         equalTo(TransactionCommandError.InvalidAmountError)
       )
@@ -260,7 +260,7 @@ object TransactionSpec extends ZIOSpecDefault {
         store <- ZIO.service[InMemoryTransactionEventStore]
 
         // Execute the expense usecase with an invalid amount; we expect it to fail.
-        _ <- usecase.expence(userId, amount, transactionDate).ignore
+        _ <- usecase.expense(userId, amount, transactionDate).ignore
 
         // Retrieve saved events from the store
         savedEvents <- store.getAllStoredEvents()
@@ -281,7 +281,7 @@ object TransactionSpec extends ZIOSpecDefault {
         _ <- store.setShouldFailSave(true) // Set the store to fail saves
 
         // Execute the expense usecase, expecting it to fail with InfraStructureError
-        actualError <- usecase.expence(userId, amount, transactionDate).flip
+        actualError <- usecase.expense(userId, amount, transactionDate).flip
       } yield assert(actualError)(
         isSubtype[InfraStructureError.DatabaseError](
           hasField(
@@ -312,9 +312,9 @@ object TransactionSpec extends ZIOSpecDefault {
         usecase <- ZIO.service[TransactionUsecase]
         store <- ZIO.service[InMemoryTransactionEventStore]
 
-        _ <- usecase.expence(userId1, amount1, date1)
-        _ <- usecase.expence(userId2, amount2, date2)
-        _ <- usecase.expence(userId3, amount3, date3)
+        _ <- usecase.expense(userId1, amount1, date1)
+        _ <- usecase.expense(userId2, amount2, date2)
+        _ <- usecase.expense(userId3, amount3, date3)
 
         savedEvents <- store.getAllStoredEvents()
       } yield assert(savedEvents)(
@@ -323,20 +323,20 @@ object TransactionSpec extends ZIOSpecDefault {
             hasField(
               "event",
               (e: StoredTransactionEvent) => e.event,
-              isSubtype[TransactionExpenceEvent](
+              isSubtype[TransactionExpenseEvent](
                 hasField(
                   "userId",
-                  (e: TransactionExpenceEvent) => e.userId,
+                  (e: TransactionExpenseEvent) => e.userId,
                   equalTo(userId1)
                 ) &&
                   hasField(
                     "amount",
-                    (e: TransactionExpenceEvent) => e.amount,
+                    (e: TransactionExpenseEvent) => e.amount,
                     equalTo(amount1)
                   ) &&
                   hasField(
                     "transactionDate",
-                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    (e: TransactionExpenseEvent) => e.transactionDate,
                     equalTo(date1)
                   )
               )
@@ -346,20 +346,20 @@ object TransactionSpec extends ZIOSpecDefault {
             hasField(
               "event",
               (e: StoredTransactionEvent) => e.event,
-              isSubtype[TransactionExpenceEvent](
+              isSubtype[TransactionExpenseEvent](
                 hasField(
                   "userId",
-                  (e: TransactionExpenceEvent) => e.userId,
+                  (e: TransactionExpenseEvent) => e.userId,
                   equalTo(userId2)
                 ) &&
                   hasField(
                     "amount",
-                    (e: TransactionExpenceEvent) => e.amount,
+                    (e: TransactionExpenseEvent) => e.amount,
                     equalTo(amount2)
                   ) &&
                   hasField(
                     "transactionDate",
-                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    (e: TransactionExpenseEvent) => e.transactionDate,
                     equalTo(date2)
                   )
               )
@@ -369,20 +369,20 @@ object TransactionSpec extends ZIOSpecDefault {
             hasField(
               "event",
               (e: StoredTransactionEvent) => e.event,
-              isSubtype[TransactionExpenceEvent](
+              isSubtype[TransactionExpenseEvent](
                 hasField(
                   "userId",
-                  (e: TransactionExpenceEvent) => e.userId,
+                  (e: TransactionExpenseEvent) => e.userId,
                   equalTo(userId3)
                 ) &&
                   hasField(
                     "amount",
-                    (e: TransactionExpenceEvent) => e.amount,
+                    (e: TransactionExpenseEvent) => e.amount,
                     equalTo(amount3)
                   ) &&
                   hasField(
                     "transactionDate",
-                    (e: TransactionExpenceEvent) => e.transactionDate,
+                    (e: TransactionExpenseEvent) => e.transactionDate,
                     equalTo(date3)
                   )
               )

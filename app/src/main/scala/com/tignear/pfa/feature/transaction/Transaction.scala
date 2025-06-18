@@ -7,19 +7,19 @@ import com.tignear.pfa.core.InfraStructureError;
 import zio._
 
 sealed trait TransactionEvent extends Event
-case class TransactionExpenceEvent(
+case class TransactionExpenseEvent(
     userId: UserId,
     amount: Long,
     transactionDate: Instant
 ) extends TransactionEvent {
-  def eventType: String = "TransactionExpenceEvent"
+  def eventType: String = "TransactionExpenseEvent"
 }
 sealed trait TransactionCommand extends Command
-case class TransactionExpenceCommand(
-      userId: UserId,
-      amount: Long,
-      transactionDate: Instant
-  ) extends TransactionCommand
+case class TransactionExpenseCommand(
+    userId: UserId,
+    amount: Long,
+    transactionDate: Instant
+) extends TransactionCommand
 sealed trait TransactionCommandError
 object TransactionCommandError {
   case object InvalidAmountError extends TransactionCommandError
@@ -29,12 +29,12 @@ object TransactionAggregate:
   def handleCommand(
       command: TransactionCommand
   ): Either[TransactionCommandError, TransactionEvent] = command match {
-    case expenseCmd: TransactionExpenceCommand =>
+    case expenseCmd: TransactionExpenseCommand =>
       if (expenseCmd.amount < 0) {
         Left(TransactionCommandError.InvalidAmountError)
       } else {
         Right(
-          TransactionExpenceEvent(
+          TransactionExpenseEvent(
             amount = expenseCmd.amount,
             userId = expenseCmd.userId,
             transactionDate = expenseCmd.transactionDate
@@ -48,12 +48,12 @@ trait TransactionEventStore:
 
 type TransactionUsecaseError = TransactionCommandError | InfraStructureError;
 class TransactionUsecase(store: TransactionEventStore):
-  def expence(
+  def expense(
       userId: UserId,
       amount: Long,
       transactionDate: Instant
   ): ZIO[Any, TransactionUsecaseError, Unit] = {
-    val command = TransactionExpenceCommand(
+    val command = TransactionExpenseCommand(
       amount = amount,
       transactionDate = transactionDate,
       userId = userId
