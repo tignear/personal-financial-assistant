@@ -1,0 +1,7 @@
+/.metals
+/.vscode
+.bloop/
+target/
+/bin/
+/.bsp
+!/.devcontainer
