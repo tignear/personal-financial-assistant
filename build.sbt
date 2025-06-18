@@ -25,13 +25,14 @@ lazy val app = (project in file("app"))
       dependencies.zio_interop_cats,
       dependencies.tapir_http4s_server_zio,
       dependencies.tapir_json_circe,
+      dependencies.zio,
       dependencies.zio_test,
       dependencies.zio_test_sbt
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZioTestFramework"))
   )
 val http4sVersion = "0.23.30"
-val zioVersion = "2.0.0"
+val zioVersion = "2.1.19"
 lazy val dependencies =
   new {
     val http4s_ember = "org.http4s" %% "http4s-ember-server" % http4sVersion;
@@ -40,6 +41,7 @@ lazy val dependencies =
       "com.softwaremill.sttp.tapir" %% "tapir-http4s-server-zio" % "1.11.34"
     val tapir_json_circe =
       "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.11.34";
+    val zio = "dev.zio" %% "zio" % zioVersion;
     val zio_test = "dev.zio" %% "zio-test" % zioVersion % Test;
     val zio_test_sbt = "dev.zio" %% "zio-test-sbt" % zioVersion % Test;
   }

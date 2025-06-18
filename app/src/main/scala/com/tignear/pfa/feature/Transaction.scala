@@ -4,7 +4,7 @@ import com.tignear.pfa.core.Types.UserId;
 import com.tignear.pfa.core.{Command, Event};
 import java.time.Instant
 import com.tignear.pfa.core.InfraStructureError;
-import zio.ZIO
+import zio._
 
 sealed trait TransactionEvent extends Event:
   override def eventType: String = "TransactionEvent"
@@ -61,12 +61,10 @@ class TransactionUsecase(store: TransactionEventStore):
       transactionDate = transactionDate,
       userId = userId
     )
-    TransactionAggregate.handleCommand(command) match {
-      case Left(error) => {
-        ZIO.fail(error)
-      }
-      case Right(event) => {
-        store.save(event)
-      }
-    }
+    ZIO
+      .fromEither(TransactionAggregate.handleCommand(command))
+      .flatMap(store.save)
   }
+object TransactionUsecase:
+  val layer: ZLayer[TransactionEventStore, Nothing, TransactionUsecase] =
+    ZLayer.fromFunction(new TransactionUsecase(_))

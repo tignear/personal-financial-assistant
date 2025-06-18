@@ -11,4 +11,6 @@ trait Event{
   def eventType: String
 }
 sealed trait InfraStructureError
-case class DatabaseError(cause: Throwable) extends InfraStructureError
+object InfraStructureError{
+  case class DatabaseError(cause: Throwable) extends InfraStructureError
+}
