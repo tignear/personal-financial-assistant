@@ -1,4 +1,4 @@
-package com.tignear
+package com.tignear.pfa
 import cats.syntax.all.*
 import io.circe.generic.auto.*
 import org.http4s.*

@@ -7,7 +7,7 @@ enablePlugins(GraalVMNativeImagePlugin)
 
 lazy val root = (project in file("."))
   .settings(
-    Compile / mainClass := Some("com.tignear.HelloWorld"),
+    Compile / mainClass := Some("com.tignear.pfa.HelloWorld"),
     graalVMNativeImageOptions ++= Seq(
       "--no-fallback",
       "--install-exit-handlers",
@@ -24,10 +24,14 @@ lazy val app = (project in file("app"))
       dependencies.http4s_ember,
       dependencies.zio_interop_cats,
       dependencies.tapir_http4s_server_zio,
-      dependencies.tapir_json_circe
-    )
+      dependencies.tapir_json_circe,
+      dependencies.zio_test,
+      dependencies.zio_test_sbt
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZioTestFramework"))
   )
 val http4sVersion = "0.23.30"
+val zioVersion = "2.0.0"
 lazy val dependencies =
   new {
     val http4s_ember = "org.http4s" %% "http4s-ember-server" % http4sVersion;
@@ -35,5 +39,7 @@ lazy val dependencies =
     val tapir_http4s_server_zio =
       "com.softwaremill.sttp.tapir" %% "tapir-http4s-server-zio" % "1.11.34"
     val tapir_json_circe =
-      "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.11.34"
+      "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % "1.11.34";
+    val zio_test = "dev.zio" %% "zio-test" % zioVersion % Test;
+    val zio_test_sbt = "dev.zio" %% "zio-test-sbt" % zioVersion % Test;
   }
