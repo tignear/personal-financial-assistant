@@ -3,6 +3,7 @@ package com.tignear.pfa.feature
 import com.tignear.pfa.core.Types.UserId;
 import com.tignear.pfa.core.{Command, Event};
 import java.time.Instant
+import com.tignear.pfa.core.InfraStructureError;
 import zio.ZIO
 
 sealed trait TransactionEvent extends Event:
@@ -45,12 +46,16 @@ object TransactionAggregate:
       }
   }
 
+trait TransactionEventStore:
+  def save(event: TransactionEvent): ZIO[Any, InfraStructureError, Unit]
+
+type TransactionUsecaseError = TransactionCommandError | InfraStructureError;
 class TransactionUsecase(store: TransactionEventStore):
   def expence(
       userId: UserId,
       amount: Long,
       transactionDate: Instant
-  ): ZIO[Any, Throwable, Unit] = {
+  ): ZIO[Any, TransactionUsecaseError, Unit] = {
     val command = TransactionCommand.Expence(
       amount = amount,
       transactionDate = transactionDate,
@@ -58,7 +63,7 @@ class TransactionUsecase(store: TransactionEventStore):
     )
     TransactionAggregate.handleCommand(command) match {
       case Left(error) => {
-        ???
+        ZIO.fail(error)
       }
       case Right(event) => {
         store.save(event)

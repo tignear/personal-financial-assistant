@@ -13,13 +13,16 @@ import com.tignear.pfa.feature.TransactionCommand
 import com.tignear.pfa.feature.TransactionAggregate
 import com.tignear.pfa.feature.TransactionCommandError
 import com.tignear.pfa.feature.TransactionEventStore
+import com.tignear.pfa.core.InfraStructureError
 
 object TransactionSpec extends ZIOSpecDefault {
   class InMemoryTransactionEventStore(eventsRef: TRef[List[TransactionEvent]])
       extends TransactionEventStore {
-    override def save(event: TransactionEvent): ZIO[Any, Throwable, Unit] =
+    override def save(
+        event: TransactionEvent
+    ): ZIO[Any, InfraStructureError, Unit] =
       STM.atomically {
-        eventsRef.update(event :: _) // 新しいイベントをリストの先頭に追加
+        eventsRef.update(event :: _)
       }.unit
   }
   object InMemoryTransactionEventStore {
@@ -59,12 +62,17 @@ object TransactionSpec extends ZIOSpecDefault {
               hasField(
                 "amount",
                 (e: TransactionExpenceRecord) => e.amount,
-                equalTo(-1500L)
+                equalTo(1500L)
               ) &&
               hasField(
                 "transactionDate",
                 (e: TransactionExpenceRecord) => e.transactionDate,
                 equalTo(transactionDate)
+              ) &&
+              hasField(
+                "eventType",
+                (e: TransactionExpenceRecord) => e.eventType,
+                equalTo("TransactionEvent")
               )
           )
         )
