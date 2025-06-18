@@ -6,7 +6,7 @@ CREATE TABLE event (
     payload JSONB NOT NULL,
     version BIGINT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
-    user_id BIGINT,
+    user_id VARCHAR(64),
     CONSTRAINT event_stream_unique UNIQUE (stream_type, stream_id, version)
 );
 CREATE INDEX idx_event_user_id ON event(user_id);

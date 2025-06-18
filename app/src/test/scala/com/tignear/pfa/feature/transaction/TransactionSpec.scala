@@ -28,6 +28,12 @@ import zio.stm._
 import com.tignear.pfa.core.Types._
 import com.tignear.pfa.feature.transaction._
 import com.tignear.pfa.core.InfraStructureError
+import io.getquill.jdbczio.Quill
+import io.getquill._
+import com.typesafe.config.ConfigFactory
+import java.io.File
+import io.getquill.jdbczio.Quill
+import com.tignear.pfa.infrastructure.EventRow
 
 object TransactionSpec extends ZIOSpecDefault {
   case class StoredTransactionEvent(
@@ -113,7 +119,7 @@ object TransactionSpec extends ZIOSpecDefault {
     def getAllStoredEvents(): ZIO[Any, Nothing, List[StoredTransactionEvent]] =
       STM.atomically {
         eventsRef.get.map(
-          _.values.flatten.toList.sortBy(e => (e.event.userId.id, e.version))
+          _.values.flatten.toList.sortBy(e => (e.event.userId, e.version))
         )
       }
   }
@@ -144,7 +150,7 @@ object TransactionSpec extends ZIOSpecDefault {
   // Suite for TransactionAggregate direct behavior
   val suite1 = suite("TransactionAggregate behavior")(
     test("should record a new expense when RecordExpenseCommand is valid") {
-      val userId = UserId(1673)
+      val userId = "1673"
       val transactionDate = Instant.now()
 
       val command = TransactionExpenseCommand(
@@ -192,7 +198,7 @@ object TransactionSpec extends ZIOSpecDefault {
       val command = TransactionExpenseCommand(
         amount = -100L,
         transactionDate = Instant.now(),
-        userId = UserId(1673)
+        userId = "1673"
       )
       val result = TransactionAggregate.handleCommand(command)
       assert(result)(
@@ -204,7 +210,7 @@ object TransactionSpec extends ZIOSpecDefault {
   // Suite for TransactionUsecase behavior, utilizing the in-memory store
   val suite2 = suite("TransactionUsecase behavior")(
     test("should successfully record an expense and save the event") {
-      val userId = UserId(2001)
+      val userId = "2001"
       val amount = 2500L
       val transactionDate = Instant.now()
 
@@ -255,7 +261,7 @@ object TransactionSpec extends ZIOSpecDefault {
     test(
       "should return InvalidAmountError when expense amount is non-positive"
     ) {
-      val userId = UserId(2002)
+      val userId = "2002"
       val amount = -500L
       val transactionDate = Instant.now()
 
@@ -270,7 +276,7 @@ object TransactionSpec extends ZIOSpecDefault {
       InMemoryTransactionEventStore.createLayer() >>> TransactionUsecase.layer
     ),
     test("should not save any event when an expense command is invalid") {
-      val userId = UserId(2003)
+      val userId = "2003"
       val amount = -100L // Invalid amount
       val transactionDate = Instant.now()
 
@@ -289,7 +295,7 @@ object TransactionSpec extends ZIOSpecDefault {
       TransactionUsecase.layer
     ),
     test("should propagate InfraStructureError when event saving fails") {
-      val userId = UserId(2004)
+      val userId = "2004"
       val amount = 1000L
       val transactionDate = Instant.now()
 
@@ -315,15 +321,15 @@ object TransactionSpec extends ZIOSpecDefault {
       TransactionUsecase.layer
     ),
     test("should correctly save multiple valid expense events in order") {
-      val userId1 = UserId(3001)
+      val userId1 = "3001"
       val amount1 = 100L
       val date1 = Instant.now()
 
-      val userId2 = UserId(3001) // Same user, different transaction
+      val userId2 = "3001" // Same user, different transaction
       val amount2 = 200L
       val date2 = Instant.now().plusSeconds(1) // Slightly later
 
-      val userId3 = UserId(3002) // Different user
+      val userId3 = "3002" // Different user
       val amount3 = 50L
       val date3 = Instant.now().plusSeconds(2)
 
@@ -414,5 +420,37 @@ object TransactionSpec extends ZIOSpecDefault {
     TransactionUsecase.layer
   )
 
-  override def spec = suite("Transaction Features")(suite1, suite2)
+  val config = ConfigFactory.load("application.conf")
+  val dataSourceLayer: ZLayer[Any, Throwable, javax.sql.DataSource] =
+    Quill.DataSource.fromConfig {
+      config.getConfig("Quill.dataSource")
+    }
+
+  val testPostgresLayer
+      : ZLayer[javax.sql.DataSource, Throwable, Quill.Postgres[SnakeCase]] =
+    Quill.Postgres.fromNamingStrategy(SnakeCase)
+
+  import java.time.Instant
+  import com.tignear.pfa.core.Types.UserId
+
+  def postgresEventStoreSpec =
+    suite("PostgresTransactionEventStore integration")(
+      test("should save an event with PostgresTransactionEventStore") {
+        val userId = "9999"
+        val event = TransactionExpenseEvent(userId, 1000L, Instant.now())
+        for {
+          _ <- ZIO.serviceWithZIO[Quill.Postgres[SnakeCase]] { ctx =>
+            ctx.run(querySchema[EventRow[TransactionEvent]]("event").delete)
+          }
+          _ <- ZIO.serviceWithZIO[TransactionEventStore](_.save(event))
+        } yield assertCompletes
+      }
+    ).provide(
+      dataSourceLayer,
+      testPostgresLayer,
+      PostgresTransactionEventStore.layer
+    )
+
+  override def spec =
+    suite("Transaction Features")(suite1, suite2, postgresEventStoreSpec)
 }

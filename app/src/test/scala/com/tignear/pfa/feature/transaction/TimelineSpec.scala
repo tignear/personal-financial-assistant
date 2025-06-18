@@ -44,8 +44,8 @@ object TimelineSpec extends ZIOSpecDefault {
       )
   }
 
-  val userId = UserId(1)
-  val otherUserId = UserId(2)
+  val userId = "1"
+  val otherUserId = "2"
   val base = Instant.parse("2025-06-01T00:00:00Z")
 
   // Helper to sum amounts in a list of events

@@ -10,6 +10,10 @@ import io.getquill._
 import io.circe.syntax.EncoderOps
 import io.circe.generic.auto._
 import io.getquill.jdbczio.Quill
+import zio.json.DeriveJsonEncoder
+import zio.json.DeriveJsonDecoder
+import zio.json.JsonEncoder
+import zio.json.JsonDecoder
 
 sealed trait TransactionEvent extends Event {
   def transactionDate: Instant
@@ -60,15 +64,19 @@ class PostgresTransactionEventStore(
 ) extends TransactionEventStore {
   import ctx._
   import com.tignear.pfa.infrastructure.EventRow._ // for MappedEncoding
-
+  inline def schema = querySchema[EventRow[TransactionEvent]]("event")
+  implicit val eventJsonbEncoder: JsonEncoder[TransactionEvent] =
+    DeriveJsonEncoder.gen[TransactionEvent]
+  implicit val eventJsonbDecoder: JsonDecoder[TransactionEvent] =
+      DeriveJsonDecoder.gen[TransactionEvent]
   def save(
       event: TransactionEvent
   ): ZIO[Any, InfraStructureError, Unit] = {
     val streamType = "transaction"
-    val streamId = event.userId.id.toString
+    val streamId = event.userId
     val eventType = event.eventType
     inline def selectMaxVersion = quote {
-      query[EventRow]
+      schema
         .filter(e =>
           e.stream_type == lift(streamType) && e.stream_id == lift(streamId)
         )
@@ -78,17 +86,16 @@ class PostgresTransactionEventStore(
     def tryInsert: ZIO[Any, Throwable, Boolean] = for {
       maxVersionOpt <- ctx.run(selectMaxVersion)
       nextVersion = maxVersionOpt.getOrElse(0L) + 1L
-      payloadJson = event.asJson
       row = EventRow(
         stream_type = streamType,
         stream_id = streamId,
         event_type = eventType,
-        payload = payloadJson,
+        payload = JsonbValue(event),
         version = nextVersion,
-        user_id = Some(event.userId.id)
+        user_id = Some(event.userId)
       )
       count <- run(
-        querySchema[EventRow]("event").insertValue(lift(row)).onConflictIgnore
+        schema.insertValue(lift(row)).onConflictIgnore
       )
     } yield count > 0
 

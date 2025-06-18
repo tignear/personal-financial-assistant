@@ -34,7 +34,8 @@ lazy val app = (project in file("app"))
       dependencies.zio,
       dependencies.zio_test,
       dependencies.zio_test_sbt,
-      dependencies.quill_jdbc_zio
+      dependencies.quill_jdbc_zio,
+      dependencies.postgresql
     )
   )
 val http4sVersion = "0.23.30"
@@ -51,4 +52,11 @@ lazy val dependencies =
     val zio_test = "dev.zio" %% "zio-test" % zioVersion % Test;
     val zio_test_sbt = "dev.zio" %% "zio-test-sbt" % zioVersion % Test;
     val quill_jdbc_zio = "io.getquill" %% "quill-jdbc-zio" % "4.7.3";
+    val postgresql = "org.postgresql" % "postgresql" % "42.7.3";
   }
+
+// テスト用DBのFlyway設定（Testスコープ）
+Test / flywayUrl := "jdbc:postgresql://localhost:55532/pfa_test_db"
+Test / flywayUser := "pfa_user"
+Test / flywayPassword := "pfa_pass"
+Test / flywayLocations := Seq("filesystem:app/src/main/resources/db/migration")

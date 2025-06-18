@@ -38,11 +38,13 @@
     ```bash
     docker compose up -d
     # DB: localhost:55432, ユーザー: pfa_user, パスワード: pfa_pass, DB名: pfa_db
+    # DB: localhost:55532, ユーザー: pfa_user, パスワード: pfa_pass, DB名: pfa_test_db
     ```
 
 2. DBマイグレーション（テーブル作成）
 
     ```bash
+    sbt Test/flywayMigrate
     sbt flywayMigrate
     # eventテーブルが作成される
     ```
