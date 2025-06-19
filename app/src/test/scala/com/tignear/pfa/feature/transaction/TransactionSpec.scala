@@ -454,7 +454,7 @@ object TransactionSpec extends ZIOSpecDefault {
     )
 
   // Helper to clear the table once and generate a unique userId for all tests
-  lazy val integrationUserId: String = java.util.UUID.randomUUID().toString
+  def integrationUserId(): String = java.util.UUID.randomUUID().toString
   lazy val clearTableOnce: ZIO[Quill.Postgres[SnakeCase], Throwable, Unit] =
     ZIO.serviceWithZIO[Quill.Postgres[SnakeCase]] { ctx =>
       import ctx._
@@ -472,7 +472,7 @@ object TransactionSpec extends ZIOSpecDefault {
       "PostgresTransactionEventStore + PostgresTransactionEventReader integration"
     )(
       test("should save and read back an event using Postgres") {
-        val userId = integrationUserId
+        val userId = integrationUserId()
         val event = TransactionExpenseEvent(userId, 12345L, Instant.now())
         for {
           _ <- clearTableOnce
@@ -490,11 +490,52 @@ object TransactionSpec extends ZIOSpecDefault {
       com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventReader.layer
     )
 
+  def postgresEventReaderFilteringSpec =
+    suite("PostgresTransactionEventReader filtering integration")(
+      test("should filter events by from and to in Scala after DB fetch") {
+        val userId = integrationUserId()
+        val now = Instant.now()
+        val event1 = TransactionExpenseEvent(
+          userId,
+          100L,
+          now.minusSeconds(3600)
+        ) // before
+        val event2 = TransactionExpenseEvent(userId, 200L, now) // in range
+        val event3 = TransactionExpenseEvent(
+          userId,
+          300L,
+          now.plusSeconds(3600)
+        ) // in range
+        val event4 =
+          TransactionExpenseEvent(userId, 400L, now.plusSeconds(7200)) // after
+        for {
+          _ <- clearTableOnce
+          store <- ZIO.service[TransactionEventStore]
+          reader <- ZIO.service[TransactionEventReader]
+          _ <- store.save(event1)
+          _ <- store.save(event2)
+          _ <- store.save(event3)
+          _ <- store.save(event4)
+          // from = now, to = now + 3601 (should include event2 and event3)
+          events <- reader.read(userId, Some(now), Some(now.plusSeconds(3601)))
+        } yield {
+          val amounts = events.map(_.amount)
+          assert(amounts)(Assertion.hasSameElements(List(200L, 300L)))
+        }
+      }
+    ).provide(
+      dataSourceLayer,
+      testPostgresLayer,
+      PostgresTransactionEventStore.layer,
+      com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventReader.layer
+    )
+
   override def spec =
     suite("Transaction Features")(
       suite1,
       suite2,
       postgresEventStoreSpec,
-      postgresEventStoreAndReaderSpec
+      postgresEventStoreAndReaderSpec,
+      postgresEventReaderFilteringSpec
     )
 }

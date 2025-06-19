@@ -22,7 +22,6 @@ class PostgresTransactionEventReader(ctx: Quill.Postgres[SnakeCase])
       from: Option[Instant],
       to: Option[Instant]
   ): ZIO[Any, InfraStructureError, List[TransactionEvent]] = {
-    // Note: Filtering by transactionDate inside JSON is not efficient; ideally, store transactionDate as a column
     ctx
       .run(
         query[Event[PostgresTransactionEventPayload]]
@@ -33,22 +32,26 @@ class PostgresTransactionEventReader(ctx: Quill.Postgres[SnakeCase])
       .mapBoth(
         e => InfraStructureError.DatabaseError(e),
         rows =>
-          rows.flatMap { row =>
-            val eventType = row.event_type
-            val payload = row.payload.value
-            eventType match {
-              case "TransactionExpenseEvent" =>
-                Some(
-                  TransactionExpenseEvent(
-                    userId = row.user_id.get,
-                    amount = payload.amount,
-                    transactionDate = payload.transactionDate
+          rows
+            .flatMap { row =>
+              val eventType = row.event_type
+              val payload = row.payload.value
+              eventType match {
+                case "TransactionExpenseEvent" =>
+                  Some(
+                    TransactionExpenseEvent(
+                      userId = row.user_id.get,
+                      amount = payload.amount,
+                      transactionDate = payload.transactionDate
+                    )
                   )
-                )
-              // Add more cases for other event types if needed
-              case _ => None
+                case _ => None
+              }
             }
-          }
+            .filter { event =>
+              from.forall(f => !event.transactionDate.isBefore(f)) &&
+              to.forall(t => event.transactionDate.isBefore(t))
+            }
       )
   }
 }
