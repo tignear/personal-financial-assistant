@@ -2,7 +2,6 @@ package com.tignear.pfa.feature.transaction.postgres
 
 import com.tignear.pfa.core.Types.UserId
 import com.tignear.pfa.core.InfraStructureError
-import com.tignear.pfa.infrastructure.EventRow
 import io.getquill.jdbczio.Quill
 import io.getquill._
 import zio._
@@ -13,23 +12,20 @@ import io.circe.generic.auto._
 import com.tignear.pfa.feature.transaction.TransactionEventReader
 import com.tignear.pfa.feature.transaction.TransactionEvent
 import com.tignear.pfa.feature.transaction.TransactionExpenseEvent
-
+import com.tignear.pfa.infrastructure.Event
 class PostgresTransactionEventReader(ctx: Quill.Postgres[SnakeCase])
     extends TransactionEventReader {
   import ctx._
   import io.getquill._
-  inline def schema =
-    querySchema[EventRow[PostgresTransactionEventPayload]]("event")
   override def read(
       userId: UserId,
       from: Option[Instant],
       to: Option[Instant]
   ): ZIO[Any, InfraStructureError, List[TransactionEvent]] = {
-
     // Note: Filtering by transactionDate inside JSON is not efficient; ideally, store transactionDate as a column
     ctx
       .run(
-        schema
+        query[Event[PostgresTransactionEventPayload]]
           .filter(_.stream_type == "transaction")
           .filter(_.stream_id == lift(userId))
           .filter(_.event_type == "TransactionExpenseEvent")

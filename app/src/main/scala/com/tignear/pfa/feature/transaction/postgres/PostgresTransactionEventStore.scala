@@ -5,7 +5,7 @@ import io.getquill.jdbczio.Quill
 import com.tignear.pfa.feature.transaction.TransactionEventStore
 import java.time.Instant
 import io.getquill._
-import com.tignear.pfa.infrastructure.EventRow
+import com.tignear.pfa.infrastructure.Event
 import zio.json.DeriveJsonEncoder
 import zio.json.JsonDecoder
 import zio.json.JsonEncoder
@@ -21,16 +21,17 @@ case class PostgresTransactionEventPayload(
     amount: Long,
     transactionDate: Instant
 )
-
+object PostgresTransactionEventPayload {
+  implicit val jsonEncoder: JsonEncoder[PostgresTransactionEventPayload] =
+    DeriveJsonEncoder.gen[PostgresTransactionEventPayload]
+  implicit val jsonDecoder: JsonDecoder[PostgresTransactionEventPayload] =
+    DeriveJsonDecoder.gen[PostgresTransactionEventPayload]
+}
 class PostgresTransactionEventStore(ctx: Quill.Postgres[SnakeCase])
     extends TransactionEventStore {
   import ctx._
   inline def schema =
-    querySchema[EventRow[PostgresTransactionEventPayload]]("event")
-  implicit val eventJsonbEncoder: JsonEncoder[PostgresTransactionEventPayload] =
-    DeriveJsonEncoder.gen[PostgresTransactionEventPayload]
-  implicit val eventJsonbDecoder: JsonDecoder[PostgresTransactionEventPayload] =
-    DeriveJsonDecoder.gen[PostgresTransactionEventPayload]
+    querySchema[Event[PostgresTransactionEventPayload]]("event")
   def save(event: TransactionEvent): ZIO[Any, InfraStructureError, Unit] = {
     val streamType = "transaction"
     val streamId = event.userId
@@ -46,7 +47,7 @@ class PostgresTransactionEventStore(ctx: Quill.Postgres[SnakeCase])
     def tryInsert: ZIO[Any, Throwable, Boolean] = for {
       maxVersionOpt <- ctx.run(selectMaxVersion)
       nextVersion = maxVersionOpt.getOrElse(0L) + 1L
-      row = EventRow(
+      row = Event(
         stream_type = streamType,
         stream_id = streamId,
         event_type = eventType,

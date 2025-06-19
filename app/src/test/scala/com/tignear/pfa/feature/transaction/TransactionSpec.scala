@@ -33,8 +33,9 @@ import io.getquill._
 import com.typesafe.config.ConfigFactory
 import java.io.File
 import io.getquill.jdbczio.Quill
-import com.tignear.pfa.infrastructure.EventRow
+import com.tignear.pfa.infrastructure.Event
 import com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventStore
+import com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventPayload
 
 object TransactionSpec extends ZIOSpecDefault {
   case class StoredTransactionEvent(
@@ -441,7 +442,7 @@ object TransactionSpec extends ZIOSpecDefault {
         val event = TransactionExpenseEvent(userId, 1000L, Instant.now())
         for {
           _ <- ZIO.serviceWithZIO[Quill.Postgres[SnakeCase]] { ctx =>
-            ctx.run(querySchema[EventRow[TransactionEvent]]("event").delete)
+            ctx.run(querySchema[Event[TransactionEvent]]("event").delete)
           }
           _ <- ZIO.serviceWithZIO[TransactionEventStore](_.save(event))
         } yield assertCompletes
@@ -452,6 +453,48 @@ object TransactionSpec extends ZIOSpecDefault {
       PostgresTransactionEventStore.layer
     )
 
+  // Helper to clear the table once and generate a unique userId for all tests
+  lazy val integrationUserId: String = java.util.UUID.randomUUID().toString
+  lazy val clearTableOnce: ZIO[Quill.Postgres[SnakeCase], Throwable, Unit] =
+    ZIO.serviceWithZIO[Quill.Postgres[SnakeCase]] { ctx =>
+      import ctx._
+      ctx
+        .run(
+          io.getquill
+            .querySchema[Event[PostgresTransactionEventPayload]]("event")
+            .delete
+        )
+        .unit
+    }
+
+  def postgresEventStoreAndReaderSpec =
+    suite(
+      "PostgresTransactionEventStore + PostgresTransactionEventReader integration"
+    )(
+      test("should save and read back an event using Postgres") {
+        val userId = integrationUserId
+        val event = TransactionExpenseEvent(userId, 12345L, Instant.now())
+        for {
+          _ <- clearTableOnce
+          _ <- ZIO.serviceWithZIO[TransactionEventStore](_.save(event))
+          events <- ZIO.serviceWithZIO[TransactionEventReader](
+            _.read(userId, None, None)
+          )
+        } yield assert(events.map(_.amount))(Assertion.contains(12345L))
+      }
+      // Add more tests here using integrationUserId
+    ).provide(
+      dataSourceLayer,
+      testPostgresLayer,
+      PostgresTransactionEventStore.layer,
+      com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventReader.layer
+    )
+
   override def spec =
-    suite("Transaction Features")(suite1, suite2, postgresEventStoreSpec)
+    suite("Transaction Features")(
+      suite1,
+      suite2,
+      postgresEventStoreSpec,
+      postgresEventStoreAndReaderSpec
+    )
 }

@@ -1,7 +1,5 @@
 package com.tignear.pfa.feature.transaction
 
-
-
 import java.time.Instant
 import com.tignear.pfa.core.Types.UserId
 
@@ -13,9 +11,9 @@ sealed trait TransactionEvent {
   def eventType: String
 }
 case class TransactionExpenseEvent(
-  userId: UserId,
-  amount: Long,
-  transactionDate: Instant
+    userId: UserId,
+    amount: Long,
+    transactionDate: Instant
 ) extends TransactionEvent {
   def eventType: String = "TransactionExpenseEvent"
 }
