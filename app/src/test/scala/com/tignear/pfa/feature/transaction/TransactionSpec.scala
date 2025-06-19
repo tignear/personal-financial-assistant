@@ -34,6 +34,7 @@ import com.typesafe.config.ConfigFactory
 import java.io.File
 import io.getquill.jdbczio.Quill
 import com.tignear.pfa.infrastructure.EventRow
+import com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventStore
 
 object TransactionSpec extends ZIOSpecDefault {
   case class StoredTransactionEvent(

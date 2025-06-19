@@ -1,4 +1,4 @@
-package com.tignear.pfa.feature.transaction
+package com.tignear.pfa.feature.timeline
 
 /** TimelineSpec tests the business rules for Timeline aggregation:
   *
@@ -22,6 +22,10 @@ import zio._
 import java.time.Instant
 import com.tignear.pfa.core.Types.UserId
 import com.tignear.pfa.core.InfraStructureError
+import com.tignear.pfa.feature.timeline.Timeline
+import com.tignear.pfa.feature.transaction.TransactionEvent
+import com.tignear.pfa.feature.transaction.TransactionEventReader
+import com.tignear.pfa.feature.transaction.TransactionExpenseEvent
 
 object TimelineSpec extends ZIOSpecDefault {
   // Dummy TransactionEventReader for testing

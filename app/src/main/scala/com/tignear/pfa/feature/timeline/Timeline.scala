@@ -1,10 +1,12 @@
-package com.tignear.pfa.feature.transaction
+package com.tignear.pfa.feature.timeline
 
 import com.tignear.pfa.core.InfraStructureError
 import java.time.Instant
 import com.tignear.pfa.core.Types.UserId
 import zio.ZIO
 import zio.Cause
+import com.tignear.pfa.feature.transaction.TransactionEventReader
+import com.tignear.pfa.feature.transaction.TransactionEvent
 
 sealed trait TimelineQueryError
 object TimelineQueryError {

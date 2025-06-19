@@ -5,6 +5,7 @@ import zio.json.DeriveJsonEncoder
 
 object Types {
   type UserId = String
+  type AccountId = String
 }
 trait Command {
   def userId: Types.UserId
