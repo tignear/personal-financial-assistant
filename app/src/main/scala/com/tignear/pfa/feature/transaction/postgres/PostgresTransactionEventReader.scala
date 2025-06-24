@@ -12,7 +12,7 @@ import io.circe.generic.auto._
 import com.tignear.pfa.feature.transaction.TransactionEventReader
 import com.tignear.pfa.feature.transaction.TransactionEvent
 import com.tignear.pfa.feature.transaction.TransactionExpenseEvent
-import com.tignear.pfa.infrastructure.Event
+import com.tignear.pfa.infrastructure.WriteEvent
 class PostgresTransactionEventReader(ctx: Quill.Postgres[SnakeCase])
     extends TransactionEventReader {
   import ctx._
@@ -24,7 +24,7 @@ class PostgresTransactionEventReader(ctx: Quill.Postgres[SnakeCase])
   ): ZIO[Any, InfraStructureError, List[TransactionEvent]] = {
     ctx
       .run(
-        query[Event[PostgresTransactionEventPayload]]
+        query[WriteEvent[PostgresTransactionEventPayload]]
           .filter(_.stream_type == "transaction")
           .filter(_.stream_id == lift(userId))
           .filter(_.event_type == "TransactionExpenseEvent")

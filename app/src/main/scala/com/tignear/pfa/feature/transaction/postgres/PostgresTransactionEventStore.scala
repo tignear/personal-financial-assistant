@@ -5,7 +5,7 @@ import io.getquill.jdbczio.Quill
 import com.tignear.pfa.feature.transaction.TransactionEventStore
 import java.time.Instant
 import io.getquill._
-import com.tignear.pfa.infrastructure.Event
+import com.tignear.pfa.infrastructure.WriteEvent
 import zio.json.DeriveJsonEncoder
 import zio.json.JsonDecoder
 import zio.json.JsonEncoder
@@ -31,7 +31,7 @@ class PostgresTransactionEventStore(ctx: Quill.Postgres[SnakeCase])
     extends TransactionEventStore {
   import ctx._
   inline def schema =
-    querySchema[Event[PostgresTransactionEventPayload]]("event")
+    querySchema[WriteEvent[PostgresTransactionEventPayload]]("event")
   def save(event: TransactionEvent): ZIO[Any, InfraStructureError, Unit] = {
     val streamType = "transaction"
     val streamId = event.userId
@@ -47,7 +47,7 @@ class PostgresTransactionEventStore(ctx: Quill.Postgres[SnakeCase])
     def tryInsert: ZIO[Any, Throwable, Boolean] = for {
       maxVersionOpt <- ctx.run(selectMaxVersion)
       nextVersion = maxVersionOpt.getOrElse(0L) + 1L
-      row = Event(
+      row = WriteEvent(
         stream_type = streamType,
         stream_id = streamId,
         event_type = eventType,

@@ -33,7 +33,7 @@ import io.getquill._
 import com.typesafe.config.ConfigFactory
 import java.io.File
 import io.getquill.jdbczio.Quill
-import com.tignear.pfa.infrastructure.Event
+import com.tignear.pfa.infrastructure.WriteEvent
 import com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventStore
 import com.tignear.pfa.feature.transaction.postgres.PostgresTransactionEventPayload
 
@@ -442,7 +442,7 @@ object TransactionSpec extends ZIOSpecDefault {
         val event = TransactionExpenseEvent(userId, 1000L, Instant.now())
         for {
           _ <- ZIO.serviceWithZIO[Quill.Postgres[SnakeCase]] { ctx =>
-            ctx.run(querySchema[Event[TransactionEvent]]("event").delete)
+            ctx.run(querySchema[WriteEvent[TransactionEvent]]("event").delete)
           }
           _ <- ZIO.serviceWithZIO[TransactionEventStore](_.save(event))
         } yield assertCompletes
@@ -461,7 +461,7 @@ object TransactionSpec extends ZIOSpecDefault {
       ctx
         .run(
           io.getquill
-            .querySchema[Event[PostgresTransactionEventPayload]]("event")
+            .querySchema[WriteEvent[PostgresTransactionEventPayload]]("event")
             .delete
         )
         .unit
